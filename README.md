@@ -1,6 +1,6 @@
 # Validación modo real y modo protegido — Arquitectura de Computadores · x86
 
-🚀 **[Ver Demo en Vivo (GitHub Pages)](https://camilobautist.github.io/Pagina_Arqui/)**
+🚀 **[Ver Demo en Vivo (GitHub Pages)](https://camilobautist.github.io/Pagina_Arquitectura/)**
 
 Laboratorio interactivo para calcular direcciones de memoria en **modo real** y **modo protegido**
 y (próximamente) analizar descriptores binarios de 64 bits. No tiene dependencias: solo necesita **Node.js 18 o superior**.
