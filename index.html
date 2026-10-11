@@ -11,6 +11,7 @@
   <script src="src/js/ui/navegacion.js" defer></script>
   <script src="src/js/ui/vista-modo-real.js" defer></script>
   <script src="src/js/ui/vista-modo-protegido.js" defer></script>
+  <script src="src/js/ui/vista-reversing.js" defer></script>
   <script src="src/js/app.js" defer></script>
 </head>
 <body>
@@ -103,10 +104,10 @@
 
     <section class="simulator-panel view" id="modo-protegido" data-view="modo-protegido" hidden>
       <div class="panel-heading"><div><p class="eyebrow">SIMULADOR 02</p><h2>Validación de modo protegido</h2></div><span class="panel-badge teal">SEGMENTACIÓN</span></div>
-      <p class="panel-intro">La dirección lineal se obtiene sumando la base del segmento y el desplazamiento, después de validar el selector, el descriptor, los privilegios, el tipo de acceso y el límite. Prueba por ejemplo selector <code>0008</code>, CS, offset <code>00001000</code>.</p>
+      <p class="panel-intro">Ingresa un <strong>descriptor</strong> (16 dígitos hexadecimales o 64 bits en binario), un <strong>selector</strong> y el <strong>tipo de segmento</strong> (CS, DS o SS). La dirección lineal se obtiene sumando la base del descriptor y el desplazamiento, después de validar el descriptor, los privilegios (RPL, DPL, CPL), el tipo de acceso y el límite. Prueba por ejemplo selector <code>0008</code>, CS, descriptor <code>00CF9A000000FFFF</code> y offset <code>00001000</code>.</p>
       <div class="protected-preview">
         <div class="preview-step"><span>01</span><strong>Selector</strong><small>Índice + TI + RPL</small></div><b>→</b>
-        <div class="preview-step"><span>02</span><strong>GDT / LDT</strong><small>Tabla de descriptores</small></div><b>→</b>
+        <div class="preview-step"><span>02</span><strong>GDT / LDT</strong><small>Tabla de descriptores (opcional)</small></div><b>→</b>
         <div class="preview-step"><span>03</span><strong>Descriptor</strong><small>Base + límite + atributos</small></div>
       </div>
       <div class="form-grid protected-fields">
@@ -115,6 +116,8 @@
         <label>Desplazamiento / Offset (hexadecimal)<input id="pOffset" value="00001000" maxlength="8" inputmode="text" autocomplete="off"><small>Rango: 00000000–FFFFFFFF</small></label>
         <label>Operación<select id="pOp"><option value="execute">Ejecutar</option><option value="read">Leer</option><option value="write">Escribir</option></select><small>Tipo de acceso a validar</small></label>
         <label>Nivel de privilegio actual (CPL)<select id="pCpl"><option value="0">0 · Kernel</option><option value="1">1</option><option value="2">2</option><option value="3">3 · Usuario</option></select><small>Anillo en el que se ejecuta el código</small></label>
+        <label>Origen del descriptor<select id="pOrigen"><option value="manual">Ingresado manualmente</option><option value="tabla">Leer de la GDT/LDT según el selector</option></select><small>Con «manual» del selector solo se usan TI y RPL</small></label>
+        <label class="wide">Descriptor (64 bits: 16 dígitos hexadecimales o 64 en binario)<input id="pDescriptor" value="00CF9A000000FFFF" autocomplete="off" spellcheck="false" placeholder="Ej. 00CF9A000000FFFF"><small id="pDescriptorHint">Base, límite, acceso y flags. Para analizarlo en detalle usa el módulo Descriptor Reversing.</small></label>
       </div>
       <button class="primary-button" id="calculateProtected">Validar y calcular dirección lineal →</button>
       <p class="error-message" id="protectedError" role="alert"></p>
@@ -127,17 +130,34 @@
       <div class="steps-box"><h3>Procedimiento paso a paso</h3><ol id="protectedSteps"></ol></div>
       <div class="steps-box"><h3>Descriptor leído</h3><dl class="desc-grid" id="protectedDescriptor"></dl></div>
       <div class="table-grid">
-        <div class="steps-box"><h3>GDT <small class="table-hint">(clic en una fila para usar su selector)</small></h3><div class="table-wrap"><table class="desc-table" id="gdtTable"></table></div></div>
+        <div class="steps-box"><h3>GDT <small class="table-hint">(clic en una fila para usar su selector y descriptor)</small></h3><div class="table-wrap"><table class="desc-table" id="gdtTable"></table></div></div>
         <div class="steps-box"><h3>LDT <small class="table-hint">(TI = 1)</small></h3><div class="table-wrap"><table class="desc-table" id="ldtTable"></table></div></div>
       </div>
     </section>
 
     <section class="simulator-panel view" id="reversing" data-view="reversing" hidden>
-      <div class="panel-heading"><div><p class="eyebrow">SIMULADOR 03 · VISTA PRELIMINAR</p><h2>Descriptor Reversing</h2></div><span class="panel-badge violet">ANÁLISIS BINARIO</span></div>
-      <p class="panel-intro">Aquí se analizará una entrada binaria de 64 bits que represente un descriptor x86 clásico de segmento.</p>
-      <label class="full-label">Descriptor binario (64 bits)<textarea rows="3" placeholder="Escribe los 64 bits del descriptor..." disabled></textarea></label>
+      <div class="panel-heading"><div><p class="eyebrow">SIMULADOR 03</p><h2>Descriptor Reversing</h2></div><span class="panel-badge violet">ANÁLISIS BINARIO</span></div>
+      <p class="panel-intro">Ingresa los <strong>64 bits</strong> de un descriptor de segmento x86 (bit 63 a la izquierda, bit 0 a la derecha). Puedes separar los bits con espacios o guiones. Se validará el ingreso y se mostrará qué descriptor es y cuáles son sus características.</p>
+      <label class="full-label">Descriptor binario (64 bits)<textarea id="rvInput" rows="3" spellcheck="false" autocomplete="off" placeholder="Ej. 00000000 11001111 10011010 00000000 00000000 00000000 11111111 11111111"></textarea></label>
+      <div class="rv-toolbar">
+        <span class="rv-counter" id="rvCount" aria-live="polite">0 / 64 bits</span>
+        <button class="primary-button" id="rvAnalyze" type="button">Analizar descriptor →</button>
+        <button class="secondary-button" id="rvClear" type="button">Limpiar</button>
+      </div>
+      <div class="rv-examples"><small>EJEMPLOS:</small><span id="rvExamples"></span></div>
+      <p class="error-message" id="rvError" role="alert"></p>
       <div class="bit-legend"><span class="base-key">BASE</span><span class="limit-key">LÍMITE</span><span class="access-key">ACCESO</span><span class="flags-key">FLAGS</span></div>
-      <div class="notice">Módulo visual preparado: se añadirá validación de longitud, decodificación de campos y descripción de atributos.</div>
+      <div id="rvResult" hidden>
+        <div class="summary-box" id="rvSummary"></div>
+        <div class="bitmap" id="rvBitmap" aria-label="Mapa de los 64 bits del descriptor por campos"></div>
+        <div class="result-box">
+          <div><small>DESCRIPTOR (HEX)</small><strong id="rvHex">—</strong></div>
+          <div><small>TIPO</small><strong class="rv-type" id="rvTipo">—</strong></div>
+        </div>
+        <div class="steps-box"><h3>Campos del descriptor</h3><dl class="desc-grid" id="rvFields"></dl></div>
+        <div class="steps-box"><h3>Observaciones</h3><ul class="warn-list" id="rvWarnings"></ul></div>
+        <button class="primary-button" id="rvUse" type="button">Usar este descriptor en el modo protegido →</button>
+      </div>
     </section>
 
     <section class="challenge-banner view" id="retos" data-view="retos" hidden>

@@ -4,11 +4,13 @@
   "description": "Laboratorio interactivo de direccionamiento x86: modo real, modo protegido y descriptores.",
   "private": true,
   "license": "UNLICENSED",
-  "engines": { "node": ">=18" },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node serve.js",
     "build": "node build.js",
     "preview": "node serve.js --dist",
-    "test": "node --test test/modo-real.test.js test/modo-protegido.test.js"
+    "test": "node --test test/modo-real.test.js test/modo-protegido.test.js test/descriptor.test.js"
   }
 }

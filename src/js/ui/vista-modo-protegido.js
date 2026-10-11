@@ -15,6 +15,9 @@ class VistaModoProtegido {
       offset: byId("pOffset"),
       operacion: byId("pOp"),
       cpl: byId("pCpl"),
+      origen: byId("pOrigen"),
+      descriptorEntrada: byId("pDescriptor"),
+      descriptorAyuda: byId("pDescriptorHint"),
       boton: byId("calculateProtected"),
       error: byId("protectedError"),
       resultado: byId("protectedResult"),
@@ -29,12 +32,31 @@ class VistaModoProtegido {
     };
 
     this.el.boton.addEventListener("click", () => this.calcular());
-    [this.el.selector, this.el.offset].forEach((input) =>
+    this.el.origen.addEventListener("change", () => { this.actualizarOrigen(); this.calcular(); });
+    [this.el.selector, this.el.offset, this.el.descriptorEntrada].forEach((input) =>
       input.addEventListener("keydown", (event) => {
         if (event.key === "Enter") this.calcular();
       })
     );
     this.renderTablas();
+    this.actualizarOrigen();
+    this.calcular();
+  }
+
+  /** Habilita o deshabilita el campo del descriptor según el origen elegido. */
+  actualizarOrigen() {
+    const manual = this.el.origen.value === "manual";
+    this.el.descriptorEntrada.disabled = !manual;
+    this.el.descriptorAyuda.textContent = manual
+      ? "Base, límite, acceso y flags. Para analizarlo en detalle usa el módulo Descriptor Reversing."
+      : "Modo tabla: el descriptor se lee de la GDT/LDT usando el índice y TI del selector.";
+  }
+
+  /** Carga un descriptor desde fuera (por ejemplo, desde el Reversing), pasa a modo manual y recalcula. */
+  cargarDescriptor(hex) {
+    this.el.origen.value = "manual";
+    this.el.descriptorEntrada.value = hex;
+    this.actualizarOrigen();
     this.calcular();
   }
 
@@ -54,7 +76,21 @@ class VistaModoProtegido {
     const tipoSegmento = this.el.tipoSegmento.value;
     const operacion = this.el.operacion.value;
     const cpl = Number(this.el.cpl.value);
-    const r = this.modelo.validar({ selector, tipoSegmento, offset, operacion, cpl });
+    const manual = this.el.origen.value === "manual";
+    let descriptor;
+    if (manual) {
+      const norm = ModoProtegido.normalizarDescriptor(this.el.descriptorEntrada.value);
+      if (!norm.ok) {
+        this.el.error.textContent = "Descriptor no válido. " + norm.error;
+        this.el.resultado.classList.add("invalid");
+        this.el.descriptorEntrada.setAttribute("aria-invalid", "true");
+        return;
+      }
+      this.el.descriptorEntrada.removeAttribute("aria-invalid");
+      descriptor = norm.hex;
+    }
+    const r = this.modelo.validar({ selector, tipoSegmento, offset, operacion, cpl, descriptor });
+    if (!manual && r.descriptor) this.el.descriptorEntrada.value = r.descriptor.raw; // muestra el descriptor leído de la tabla
 
     this.llenarLista(this.el.verificaciones, r.verificaciones);
     this.llenarLista(this.el.pasos, r.pasos);
@@ -71,7 +107,7 @@ class VistaModoProtegido {
       : `Acceso denegado · excepción ${r.excepcion}. Operación: ${opName} sobre segmento de ${segName}.`;
 
     this.renderDescriptor(selector, r);
-    this.renderTablas(r.selector.ti, r.descriptor ? r.selector.indice : -1);
+    this.renderTablas(r.selector.ti, !manual && r.descriptor ? r.selector.indice : -1);
   }
 
   llenarLista(el, items) {
@@ -90,7 +126,8 @@ class VistaModoProtegido {
     const selTxt = `${hex(selector, 4)}h (idx ${s.indice} · TI ${s.ti} · RPL ${s.rpl})`;
     const campos = d ? [
       ["SELECTOR", selTxt],
-      ["TABLA", `${r.tabla}[${s.indice}]`],
+      ["ORIGEN", r.origen === "manual" ? "Ingresado manualmente" : `${r.tabla}[${s.indice}]`],
+      ["DESCRIPTOR (HEX)", d.raw + "h"],
       ["BASE", hex(d.base, 8) + "h"],
       ["LÍMITE (20 BITS)", hex(d.limitRaw, 5) + "h"],
       ["LÍMITE EFECTIVO", hex(d.limit, 8) + "h"],
@@ -134,6 +171,7 @@ class VistaModoProtegido {
           });
         tr.addEventListener("click", () => {
           this.el.selector.value = hex(sel, 4);
+          this.el.descriptorEntrada.value = entrada.raw;
           this.calcular();
         });
         tbody.appendChild(tr);
